@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFileManager: () => ipcRenderer.send('open-file-manager'),
   // Configuración y Rutas
   getAppPaths: () => ipcRenderer.invoke('get-app-paths'),
+  getDownloadsPath: () => ipcRenderer.invoke('get-downloads-path'),
+  getDesktopPath: () => ipcRenderer.invoke('get-desktop-path'), // Exponer la ruta del Escritorio
 
   // Navegación y lectura
   getDirectoryContent: (path, sortBy, sortOrder) => ipcRenderer.invoke('get-directory-content', path, sortBy, sortOrder),

@@ -809,16 +809,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Initial Load
     try {
-        const appPaths = await window.electronAPI.getAppPaths();
-        const fileManagerBasePath = appPaths.fileManager;
+        // Obtener las rutas de Descargas y Escritorio del usuario
+        const downloadsPath = await window.electronAPI.getDownloadsPath();
+        const desktopPath = await window.electronAPI.getDesktopPath();
 
-        loadDirectory('left', 'computer:///'); // Panel izquierdo siempre en computer:///
-        loadDirectory('right', fileManagerBasePath); // Panel derecho en la ruta base del gestor de archivos
-
+        loadDirectory('left', downloadsPath);  // Panel izquierdo inicia en la carpeta de Descargas
+        loadDirectory('right', desktopPath);   // Panel derecho inicia en la carpeta del Escritorio
         // Establecer visualmente el panel izquierdo como activo por defecto
         panels.left.container.classList.add('panel-active');
     } catch (e) {
         console.error('Error during initial load:', e);
+        showToast(`Error en la carga inicial: ${e.message}`, 'error');
     }
 });
 

@@ -15,6 +15,41 @@ const { exec } = require('child_process');
 //   app.setAsDefaultProtocolClient('notesapp');
 // }
 
+// #region Security Validation
+let safeRoots = [];
+
+/**
+ * Initializes the list of safe root directories for path validation.
+ * On Windows, these are the logical drives (C:\, D:\, etc.).
+ * On POSIX systems, it's the root directory (/).
+ */
+async function initializeSafeRoots() {
+  if (process.platform === 'win32') {
+    const command = 'powershell.exe -NoProfile -Command "Get-Volume | Select-Object -ExpandProperty DriveLetter | ForEach-Object { if ($_) { $_ + \':\\\' } }"';
+    return new Promise((resolve) => {
+      exec(command, (error, stdout) => {
+        if (error) {
+          console.error('Could not determine safe roots:', error);
+          safeRoots = []; // Fail securely
+        } else {
+          safeRoots = stdout.split('\n').map(d => d.trim()).filter(Boolean);
+        }
+        resolve();
+      });
+    });
+  } else {
+    safeRoots = ['/'];
+    return Promise.resolve();
+  }
+}
+
+function isPathSafe(pathToValidate) {
+  if (pathToValidate === 'computer:///') return true; // Special case for drive view
+  const resolvedPath = path.resolve(pathToValidate);
+  return safeRoots.some(root => resolvedPath.startsWith(root));
+}
+// #endregion
+
 function createFileManagerWindow() {
   const fileManagerWindow = new BrowserWindow({
     width: 1400,
@@ -131,7 +166,8 @@ ipcMain.handle('get-app-paths', () => {
     fileManager: process.env.FILE_MANAGER_BASE_PATH,
   };
 });
-
+ipcMain.handle('get-downloads-path', () => app.getPath('downloads')); // Exponer ruta de Descargas
+ipcMain.handle('get-desktop-path', () => app.getPath('desktop'));     // Exponer ruta de Escritorio
 
 ipcMain.handle('get-initial-path', () => app.getPath('home'));
 ipcMain.handle('path-join', (event, ...args) => path.join(...args));
@@ -563,7 +599,8 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
-    try {
+    // Use an async block to await for safe roots initialization
+    (async () => {
       // PASO 1: Detección de Entorno y Definición de Rutas
       // Este bloque establece las variables de entorno ANTES de que cualquier otra
       // parte de la aplicación (como el servidor web) se inicie.
@@ -593,6 +630,9 @@ if (!gotTheLock) {
       fs.mkdirSync(process.env.BACKUPS_PATH, { recursive: true });
       fs.mkdirSync(process.env.FILE_MANAGER_BASE_PATH, { recursive: true });
 
+      // Initialize security roots before creating the window
+      await initializeSafeRoots();
+
       // Iniciar directamente la ventana del gestor de archivos.
       createFileManagerWindow();
 
@@ -602,14 +642,14 @@ if (!gotTheLock) {
         }
       });
 
-    } catch (error) {
+    })().catch(error => {
       // En caso de un error de arranque muy grave, lo mostramos en un diálogo simple.
       dialog.showErrorBox(
         'Error de Arranque',
         `No se pudo iniciar la aplicación:\n${error.stack || error.message}`
       );
       app.quit();
-    }
+    });
   });
 }
 
