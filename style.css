@@ -207,18 +207,17 @@ body {
   /* Transición suave para el borde y la sombra */
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
   border: 2px solid transparent; /* Borde transparente por defecto para reservar espacio */
-}
 
-/* Estilos para Drag and Drop */
-.panel.drag-over {
-  background-color: #2a2b2e;
-  border-style: dashed;
-  border-color: #8ab4f8;
-}
+  /* Estilos para Drag and Drop */
+  &.drag-over {
+    background-color: #2a2b2e;
+    border-style: dashed;
+    border-color: #8ab4f8;
+  }
 
-.panel:last-of-type { /* Corregido para CSS estándar */
-  border-right: none;
-}
+  &:last-of-type { /* Corregido para CSS estándar */
+    border-right: none;
+  }
 
   .path-display {
     padding: 10px;
@@ -271,6 +270,10 @@ body {
       &.selected {
         background-color: #4a5294;
         color: white;
+
+        .file-icon {
+          color: white;
+        }
       }
     }
   }
@@ -287,27 +290,26 @@ body {
   border-left: 1px solid #3c4043;
   border-right: 1px solid #3c4043;
 
-}
+  button {
+    background-color: #3c4043;
+    color: #e8eaed;
+    border: 1px solid #5f6368;
+    border-radius: 5px;
+    width: 60px;
+    height: 40px;
+    font-size: 20px;
+    cursor: pointer;
+    margin: 10px 0;
+    transition: background-color 0.2s;
 
-.actions-panel button {
-  background-color: #3c4043;
-  color: #e8eaed;
-  border: 1px solid #5f6368;
-  border-radius: 5px;
-  width: 60px;
-  height: 40px;
-  font-size: 20px;
-  cursor: pointer;
-  margin: 10px 0;
-  transition: background-color 0.2s;
-}
+    &:hover {
+      background-color: #5f6368;
+    }
 
-.actions-panel button:hover {
-  background-color: #5f6368;
-}
-
-.actions-panel button:active {
-  background-color: #4a5294;
+    &:active {
+      background-color: #4a5294;
+    }
+  }
 }
 
 .resizer {
@@ -427,10 +429,8 @@ body {
 .icon-code { color: #009688; } /* Teal */
 .icon-default { color: #BDBDBD; } /* Grey */
 
-/* Ensure selected items have white icons for contrast */
-.file-list li.selected .file-icon {
-    color: white;
-}
+/* Elemento huérfano movido dentro del nesting de .panel */
+/* .file-list li.selected .file-icon ya está incluido en el nesting anterior */
 
 /* Active panel indicator */
 .panel.panel-active {
@@ -533,6 +533,20 @@ body {
       object-fit: contain;
     }
 
+    #text-preview {
+      width: 100%;
+      height: 100%;
+      white-space: pre-wrap;    /* Permite que el texto se ajuste */
+      word-break: break-word;      /* Rompe palabras largas si es necesario */
+      overflow-y: auto;          /* Añade barra de desplazamiento vertical si el contenido excede */
+      background-color: #252526; /* Un fondo ligeramente distinto para el área de texto */
+      color: #e8eaed;           /* Color de texto legible */
+      padding: 1em;              /* Un poco de espacio interior */
+      box-sizing: border-box;    /* Asegura que el padding no afecte el tamaño total */
+      border-radius: 5px;
+      font-family: 'Courier New', Courier, monospace; /* Fuente monoespaciada para texto plano */
+    }
+
     #pdf-preview-container {
       display: flex;
       flex-direction: column;
@@ -566,20 +580,6 @@ body {
         border: 1px solid #5f6368;
         max-width: 100%;
       }
-    }
-
-    #text-preview {
-      width: 100%;
-      height: 100%;
-      white-space: pre-wrap;    /* Permite que el texto se ajuste */
-      word-break: break-word;      /* Rompe palabras largas si es necesario */
-      overflow-y: auto;          /* Añade barra de desplazamiento vertical si el contenido excede */
-      background-color: #252526; /* Un fondo ligeramente distinto para el área de texto */
-      color: #e8eaed;           /* Color de texto legible */
-      padding: 1em;              /* Un poco de espacio interior */
-      box-sizing: border-box;    /* Asegura que el padding no afecte el tamaño total */
-      border-radius: 5px;
-      font-family: 'Courier New', Courier, monospace; /* Fuente monoespaciada para texto plano */
     }
   }
 }
