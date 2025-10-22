@@ -22,7 +22,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPlatform: () => process.platform,
   checkFileExistence: (paths) => ipcRenderer.invoke('fs-check-existence', paths),
   getLogicalDrives: () => ipcRenderer.invoke('get-logical-drives'),
-  startSearch: (searchPath, query) => ipcRenderer.send('start-search', searchPath, query),
+  startSearch: (searchPath, query, searchType) => ipcRenderer.send('start-search', searchPath, query, searchType),
   cancelSearch: () => ipcRenderer.send('cancel-search'),
   getFileAsDataUrl: (filePath) => ipcRenderer.invoke('get-file-as-data-url', filePath),
   getFileAsBuffer: (filePath) => ipcRenderer.invoke('get-file-as-buffer', filePath),
