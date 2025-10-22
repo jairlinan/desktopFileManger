@@ -204,17 +204,21 @@ body {
   flex-direction: column;
   border-right: 1px solid #3c4043;
   overflow-y: auto;
+  /* Transición suave para el borde y la sombra */
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  border: 2px solid transparent; /* Borde transparente por defecto para reservar espacio */
+}
 
-  /* Estilos para Drag and Drop */
-  &.drag-over {
-    background-color: #2a2b2e;
-    border-style: dashed;
-    border-color: #8ab4f8;
-  }
+/* Estilos para Drag and Drop */
+.panel.drag-over {
+  background-color: #2a2b2e;
+  border-style: dashed;
+  border-color: #8ab4f8;
+}
 
-  &:last-child {
-    border-right: none;
-  }
+.panel:last-of-type { /* Corregido para CSS estándar */
+  border-right: none;
+}
 
   .path-display {
     padding: 10px;
@@ -283,29 +287,29 @@ body {
   border-left: 1px solid #3c4043;
   border-right: 1px solid #3c4043;
 
-  button {
-    background-color: #3c4043;
-    color: #e8eaed;
-    border: 1px solid #5f6368;
-    border-radius: 5px;
-    width: 60px;
-    height: 40px;
-    font-size: 20px;
-    cursor: pointer;
-    margin: 10px 0;
-    transition: background-color 0.2s;
-
-    &:hover {
-      background-color: #5f6368;
-    }
-
-    &:active {
-      background-color: #4a5294;
-    }
-  }
 }
 
-/* Resizer Handle */
+.actions-panel button {
+  background-color: #3c4043;
+  color: #e8eaed;
+  border: 1px solid #5f6368;
+  border-radius: 5px;
+  width: 60px;
+  height: 40px;
+  font-size: 20px;
+  cursor: pointer;
+  margin: 10px 0;
+  transition: background-color 0.2s;
+}
+
+.actions-panel button:hover {
+  background-color: #5f6368;
+}
+
+.actions-panel button:active {
+  background-color: #4a5294;
+}
+
 .resizer {
   width: 4px;
   background: #3c4043;
@@ -430,7 +434,9 @@ body {
 
 /* Active panel indicator */
 .panel.panel-active {
-    border-color: #8ab4f8; /* A light blue to indicate focus */
+    /* Un azul brillante y un resplandor para un foco inconfundible */
+    border-color: #007bff;
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
 }
 
 /* Toast Notifications */

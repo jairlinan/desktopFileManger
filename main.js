@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const fsPromises = require('fs').promises;
 const fse = require('fs-extra');
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 
 // Registrar el protocolo personalizado
 // Temporarily commented out to fix startup error
@@ -59,14 +59,22 @@ function createFileManagerWindow() {
   });
   fileManagerWindow.loadFile(path.join(__dirname, 'index.html'));
   fileManagerWindow.setMenu(null);
+  // Abrir las Herramientas de Desarrollo para depuración.
+  // fileManagerWindow.webContents.openDevTools();
 }
 
 // #region File System Reading
 async function getHiddenFilesWindows(dirPath) {
+    // Use execFile for security to prevent command injection.
+    // We execute 'attrib' and pass the path as a separate argument.
     return new Promise((resolve) => {
-        const command = `chcp 65001>nul && attrib "${path.join(dirPath, '* ')}"`;
-        exec(command, { windowsHide: true }, (err, stdout, stderr) => {
+        const command = 'attrib';
+        // The path needs to be constructed carefully for the 'attrib' command.
+        const args = [path.join(dirPath, '*')];
+
+        execFile(command, args, { windowsHide: true, shell: true }, (err, stdout, stderr) => {
             if (err) {
+                // Errors are common (e.g., empty directory), so we fail gracefully.
                 resolve(new Set());
                 return;
             }
@@ -89,6 +97,11 @@ async function getHiddenFilesWindows(dirPath) {
 
 ipcMain.handle('get-directory-content', async (event, dirPath, sortBy = 'name', sortOrder = 'asc') => {
   try {
+    // Security: Validate the path before using it.
+    if (!isPathSafe(dirPath)) {
+      return { error: 'Acceso denegado: Ruta no segura o inválida.' };
+    }
+
     const platform = process.platform;
     let hiddenFilesWindows = new Set();
     if (platform === 'win32') {
@@ -151,16 +164,6 @@ ipcMain.handle('get-directory-content', async (event, dirPath, sortBy = 'name', 
   }
 });
 
-// PASO 4: Exposición de Rutas al Proceso de Renderizado
-// Este handler permite que el frontend (proceso de renderizado) solicite
-// las rutas dinámicas de la aplicación de forma segura.
-ipcMain.handle('get-app-paths', () => {
-  return {
-    uploads: process.env.UPLOADS_PATH,
-    backups: process.env.BACKUPS_PATH,
-    fileManager: process.env.FILE_MANAGER_BASE_PATH,
-  };
-});
 ipcMain.handle('get-downloads-path', () => app.getPath('downloads')); // Exponer ruta de Descargas
 ipcMain.handle('get-desktop-path', () => app.getPath('desktop'));     // Exponer ruta de Escritorio
 
@@ -209,6 +212,9 @@ ipcMain.on('open-file-manager', () => {
 
 // #region Simple File Operations
 ipcMain.handle('fs-rename', async (event, oldPath, newPath) => {
+    if (!isPathSafe(oldPath) || !isPathSafe(newPath)) {
+        return { success: false, error: 'Acceso denegado: Ruta no segura o inválida.' };
+    }
     try {
         await fsPromises.rename(oldPath, newPath);
         return { success: true };
@@ -218,6 +224,9 @@ ipcMain.handle('fs-rename', async (event, oldPath, newPath) => {
 });
 
 ipcMain.handle('fs-create-folder', async (event, folderPath) => {
+    if (!isPathSafe(folderPath)) {
+        return { success: false, error: 'Acceso denegado: Ruta no segura o inválida.' };
+    }
     try {
         await fsPromises.mkdir(folderPath);
         return { success: true };
@@ -227,6 +236,9 @@ ipcMain.handle('fs-create-folder', async (event, folderPath) => {
 });
 
 ipcMain.handle('fs-create-file', async (event, filePath) => {
+    if (!isPathSafe(filePath)) {
+        return { success: false, error: 'Acceso denegado: Ruta no segura o inválida.' };
+    }
     try {
         await fsPromises.writeFile(filePath, '');
         return { success: true };
@@ -236,6 +248,9 @@ ipcMain.handle('fs-create-file', async (event, filePath) => {
 });
 
 ipcMain.handle('shell-open-path', async (event, filePath) => {
+    if (!isPathSafe(filePath)) {
+        return { success: false, error: 'Acceso denegado: Ruta no segura o inválida.' };
+    }
     const errorMessage = await shell.openPath(filePath);
     if (errorMessage) return { success: false, error: errorMessage };
     return { success: true };
@@ -244,6 +259,9 @@ ipcMain.handle('shell-open-path', async (event, filePath) => {
 
 // #region Preview Handlers
 ipcMain.handle('get-file-as-data-url', async (event, filePath) => {
+    if (!isPathSafe(filePath)) {
+        return { success: false, error: 'Acceso denegado: Ruta no segura o inválida.' };
+    }
     try {
         const fileBuffer = await fsPromises.readFile(filePath);
         const mimeType = `image/${path.extname(filePath).slice(1)}`;
@@ -254,6 +272,9 @@ ipcMain.handle('get-file-as-data-url', async (event, filePath) => {
 });
 
 ipcMain.handle('get-file-as-buffer', async (event, filePath) => {
+    if (!isPathSafe(filePath)) {
+        return { success: false, error: 'Acceso denegado: Ruta no segura o inválida.' };
+    }
     try {
         const buffer = await fsPromises.readFile(filePath);
         return { success: true, buffer };
@@ -366,6 +387,13 @@ async function performCopy(event, fileList, totalSize, destDir, options) {
 // 3. IPC Handlers using the new logic
 ipcMain.on('copy-files', async (event, sourcePaths, destDir, options) => {
     isOperationCancelled = false;
+
+    if (!isPathSafe(destDir) || !sourcePaths.every(isPathSafe)) {
+        return event.sender.send('operation-complete', {
+            success: false, errors: [{ error: 'Acceso denegado: Ruta no segura o inválida.' }], action: 'copia'
+        });
+    }
+
     const baseSourceDir = path.dirname(sourcePaths[0]);
 
     try {
@@ -398,6 +426,13 @@ ipcMain.on('copy-files', async (event, sourcePaths, destDir, options) => {
 
 ipcMain.on('move-files', async (event, sourcePaths, destDir, options) => {
     isOperationCancelled = false;
+
+    if (!isPathSafe(destDir) || !sourcePaths.every(isPathSafe)) {
+        return event.sender.send('operation-complete', {
+            success: false, errors: [{ error: 'Acceso denegado: Ruta no segura o inválida.' }], action: 'movimiento'
+        });
+    }
+
     const baseSourceDir = path.dirname(sourcePaths[0]);
 
     try {
@@ -443,6 +478,12 @@ ipcMain.on('move-files', async (event, sourcePaths, destDir, options) => {
 
 ipcMain.on('delete-files', async (event, pathsToDelete) => {
     isOperationCancelled = false;
+
+    if (!pathsToDelete.every(isPathSafe)) {
+        return event.sender.send('operation-complete', {
+            success: false, errors: [{ error: 'Acceso denegado: Ruta no segura o inválida.' }], action: 'eliminación'
+        });
+    }
     
     try {
         event.sender.send('operation-progress', { title: 'Calculando...' });
