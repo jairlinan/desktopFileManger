@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Gestor de Archivos Nativo</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="search-bar-container">
+        <input type="search" id="search-input" placeholder="Buscar archivos por nombre, extensión o contenido...">
+        <select id="search-type" title="Seleccionar tipo de búsqueda">
+            <option value="name" selected>Por Nombre</option>
+            <option value="content">Nombre y Contenido</option>
+        </select>
+        <button id="search-button"><i class="fas fa-search"></i></button>
+        <button id="refresh-drives-button" title="Actualizar unidades"><i class="fas fa-sync-alt"></i></button>
+
+        <div class="sort-controls">
+            <label for="sort-by">Ordenar por:</label>
+            <select id="sort-by">
+                <option value="name">Nombre</option>
+                <option value="type">Tipo</option>
+                <option value="size">Tamaño</option>
+                <option value="date">Fecha de Modificación</option>
+            </select>
+
+            <label for="sort-order">Orden:</label>
+            <select id="sort-order">
+                <option value="asc">Ascendente</option>
+                <option value="desc">Descendente</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="loading-indicator" class="hidden">
+        <i class="fas fa-spinner fa-spin"></i> <span>Buscando...</span>
+        <span id="search-path-display"></span>
+    </div>
+
+    <!-- Indicador de Progreso de Movimiento -->
+    <div id="move-progress-indicator">
+        <i class="fas fa-sync-alt fa-spin"></i>
+        <h3 id="move-progress-title">Preparando operación...</h3>
+        <div class="progress-bar-container">
+            <div id="progress-bar" class="progress-bar"></div>
+            <p id="progress-text">0%</p>
+        </div>
+            <div id="move-progress-details" class="progress-details-container">
+                <p id="progress-current-file"><strong>Procesando:</strong> <span>-</span></p>
+                <p id="progress-source"><strong>Origen:</strong> <span>-</span></p>
+                <p id="progress-destination"><strong>Destino:</strong> <span>-</span></p>            <p id="progress-etr"><strong>Tiempo restante:</strong> <span>Calculando...</span></p>
+        </div>
+        <button id="cancel-operation-btn" class="modal-btn modal-btn-secondary">Cancelar</button>
+    </div>
+
+    <div class="container">
+        <!-- Panel Izquierdo -->
+        <div id="panel-left" class="panel">
+            <div class="path-display">
+                <button class="nav-btn" id="up-btn-left" title="Subir un nivel"><i class="fas fa-arrow-up"></i></button>
+                <span id="path-left">/</span>
+            </div>
+            <ul class="file-list" id="file-list-left"></ul>
+        </div>
+
+        <!-- Panel de Acciones Central -->
+        <div id="panel-actions" class="actions-panel">
+            <button id="move-to-right" title="Mover a la derecha">&rarr;</button>
+            <button id="copy-to-right" title="Copiar a la derecha">C&rarr;</button>
+            <label class="checkbox-container" title="Mostrar/Ocultar archivos ocultos">
+                <input type="checkbox" id="show-hidden-checkbox">
+            </label>
+            <button id="move-to-left" title="Mover a la izquierda">&larr;</button>
+            <button id="copy-to-left" title="Copiar a la izquierda">&larr;C</button>
+        </div>
+
+        <!-- Panel Derecho -->
+        <div id="panel-right" class="panel">
+            <div class="path-display">
+                <button class="nav-btn" id="up-btn-right" title="Subir un nivel"><i class="fas fa-arrow-up"></i></button>
+                <span id="path-right">/</span>
+            </div>
+            <ul class="file-list" id="file-list-right"></ul>
+        </div>
+
+        <!-- Barra de redimensionamiento -->
+        <div id="resizer" class="resizer"></div>
+
+        <!-- Panel de Vista Previa -->
+        <div id="preview-panel" class="preview-panel">
+            <div id="preview-header" class="preview-header">
+                <span id="preview-filename"></span>
+            </div>
+            <div id="preview-content" class="preview-content">
+                <div id="preview-default-message">Selecciona un archivo de imagen, PDF o texto para previsualizar.</div>
+                <img id="image-preview" class="hidden" alt="Vista previa de imagen">
+                <pre id="text-preview" class="hidden"></pre>
+                <div id="pdf-preview-container" class="hidden">
+                    <div id="pdf-controls" class="pdf-controls">
+                        <button id="pdf-prev-page"><i class="fas fa-arrow-left"></i></button>
+                        <span>Página <span id="pdf-current-page"></span> de <span id="pdf-total-pages"></span></span>
+                        <button id="pdf-next-page"><i class="fas fa-arrow-right"></i></button>
+                    </div>
+                    <canvas id="pdf-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Menú Contextual (oculto por defecto) -->
+    <div id="context-menu" class="context-menu">
+        <ul>
+            <li id="ctx-rename">Renombrar</li>
+            <li id="ctx-delete">Eliminar</li>
+            <li class="separator"></li>
+            <li id="ctx-new-folder">Nueva Carpeta</li>
+            <li id="ctx-new-file">Nuevo Archivo de Texto</li>
+        </ul>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container"></div>
+</body>
+
+    <!-- Modal para conflictos de archivos -->
+    <div id="conflict-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Conflicto de Archivos</h2>
+            </div>
+            <div class="modal-body">
+                <p>El destino ya contiene archivos con los mismos nombres. ¿Qué deseas hacer?</p>
+                <ul id="conflict-file-list" class="conflict-list">
+                    <!-- Los archivos en conflicto se insertarán aquí -->
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button id="conflict-cancel-btn" class="modal-btn modal-btn-secondary">Cancelar</button>
+                <button id="conflict-skip-btn" class="modal-btn">Omitir</button>
+                <button id="conflict-keep-both-btn" class="modal-btn">Conservar Ambos</button>
+                <button id="conflict-overwrite-btn" class="modal-btn modal-btn-primary">Sobrescribir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para elección de Drag and Drop -->
+    <div id="dnd-choice-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Acción Requerida</h2>
+            </div>
+            <div class="modal-body">
+                <p id="dnd-choice-message">¿Qué deseas hacer con los elementos seleccionados?</p>
+            </div>
+            <div class="modal-footer">
+                <button id="dnd-cancel-btn" class="modal-btn modal-btn-secondary">Cancelar</button>
+                <button id="dnd-copy-btn" class="modal-btn">Copiar aquí</button>
+                <button id="dnd-move-btn" class="modal-btn modal-btn-primary">Mover aquí</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Reporte de Errores -->
+    <div id="error-report-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Reporte de Errores de Operación</h2>
+                <button id="error-report-close-btn" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>La operación no se pudo completar para los siguientes archivos:</p>
+                <ul id="error-report-list" class="conflict-list">
+                    <!-- Los errores se insertarán aquí dinámicamente -->
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button id="error-report-ok-btn" class="modal-btn modal-btn-primary">Aceptar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+    <script src="./renderer.js"></script>
+</body>
+</html>

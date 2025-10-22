@@ -1,0 +1,17 @@
+{
+  "name": "notesapp-desktop-manager",
+  "version": "1.0.0",
+  "description": "Gestor de notas y de archivos",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "keywords": [],
+  "author": "JairLinan",
+  "license": "ISC",
+  "dependencies": {
+    "electron": "^31.0.1",
+    "fs-extra": "^11.3.1"
+  }
+}
