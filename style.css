@@ -725,3 +725,85 @@ body {
     color: #e8eaed;
   }
 }
+
+/* Archive Preview Styles */
+.archive-list {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: #252526;
+  border-radius: 5px;
+  overflow: hidden;
+
+  .archive-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background-color: #3c4043;
+    border-bottom: 1px solid #5f6368;
+    font-weight: bold;
+
+    .archive-count {
+      font-size: 0.9em;
+      color: #8ab4f8;
+      font-weight: normal;
+    }
+  }
+
+  .archive-files {
+    flex: 1;
+    overflow-y: auto;
+    padding: 5px 0;
+
+    .archive-file {
+      display: flex;
+      align-items: center;
+      padding: 6px 15px;
+      border-bottom: 1px solid #2a2b2e;
+      font-size: 0.9em;
+
+      &:hover {
+        background-color: #3c4043;
+      }
+
+      i {
+        margin-right: 10px;
+        width: 16px;
+        text-align: center;
+      }
+
+      .archive-file-name {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-right: 10px;
+      }
+
+      .archive-file-size {
+        color: #9aa0a6;
+        font-size: 0.8em;
+        min-width: 60px;
+        text-align: right;
+      }
+    }
+
+    .archive-directory {
+      i {
+        color: #FFCA28; /* Amber for folders */
+      }
+
+      .archive-file-name {
+        font-weight: bold;
+      }
+    }
+
+    .archive-file-item {
+      i {
+        color: #BDBDBD; /* Grey for files */
+      }
+    }
+  }
+}

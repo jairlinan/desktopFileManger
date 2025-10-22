@@ -28,6 +28,7 @@ let dragSourceInfo = null;
 const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'];
 const pdfExtension = '.pdf';
 const textExtensions = ['.txt', '.md', '.js', '.json', '.css', '.html', '.log'];
+const archiveExtensions = ['.zip', '.rar', '.7z', '.tar', '.gz'];
 
 // --- Helper Functions ---
 function formatBytes(bytes, decimals = 2) {
@@ -296,9 +297,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const fileName = selectedItem.dataset.fileName;
         const ext = fileName.slice(fileName.lastIndexOf('.')).toLowerCase();
 
-        if (imageExtensions.includes(ext) || ext === pdfExtension || textExtensions.includes(ext)) {
-            const fullPath = isSearchResult 
-                ? selectedItem.querySelector('.file-path').textContent 
+        if (imageExtensions.includes(ext) || ext === pdfExtension || textExtensions.includes(ext) || archiveExtensions.includes(ext)) {
+            const fullPath = isSearchResult
+                ? selectedItem.querySelector('.file-path').textContent
                 : await window.electronAPI.pathJoin(panel.currentPath, fileName);
             showPreview(fullPath);
         } else {
@@ -321,7 +322,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const cancelOperationBtn = document.getElementById('cancel-operation-btn');
 
     // --- Preview Panel Elements Initialization ---
-    const previewPanel = document.getElementById('preview-panel');
+    const previewPanelElement = document.getElementById('preview-panel');
     const previewHeader = document.getElementById('preview-header');
     const previewFilename = document.getElementById('preview-filename');
     const previewContent = document.getElementById('preview-content');
@@ -335,6 +336,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const pdfNextPage = document.getElementById('pdf-next-page');
     const pdfCurrentPage = document.getElementById('pdf-current-page');
     const pdfTotalPages = document.getElementById('pdf-total-pages');
+
+    // Archive preview elements
+    const archiveList = document.getElementById('archive-list') || createArchiveList();
 
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js`;
 
@@ -499,7 +503,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let pageIsRendering = false;
     
     function clearPreview() {
-        if (!previewPanel) return;
+        if (!previewPanelElement) return;
 
         // Eliminar el contenedor de estado de búsqueda si existe
         const searchStatusEl = document.querySelector('.search-status-container');
@@ -511,6 +515,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         imagePreview.classList.add('hidden');
         pdfPreviewContainer.classList.add('hidden');
         textPreview.classList.add('hidden');
+
+        // Restaurar ID y clase del contenedor de texto
+        const archiveList = document.getElementById('archive-list');
+        if (archiveList) {
+            archiveList.id = 'text-preview';
+            archiveList.className = 'hidden';
+        }
+
         previewFilename.textContent = '';
         imagePreview.src = '';
         if (pdfDoc) {
@@ -519,8 +531,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    function createArchiveList() {
+        // Reutilizar el contenedor de texto existente para archivos comprimidos
+        textPreview.id = 'archive-list';
+        textPreview.className = 'archive-list';
+        return textPreview;
+    }
+
     async function showPreview(filePath) {
-        if (!previewPanel) {
+        if (!previewPanelElement) {
             return;
         }
         clearPreview();
@@ -558,9 +577,58 @@ document.addEventListener('DOMContentLoaded', async () => {
                 showToast(`Error al cargar archivo de texto: ${error}`, 'error');
                 clearPreview();
             }
+        } else if (archiveExtensions.includes(ext)) {
+            const { success, files, error } = await window.electronAPI.readZipContents(filePath);
+            if (success) {
+                showArchivePreview(files);
+            } else {
+                showToast(`Error al leer archivo comprimido: ${error}`, 'error');
+                clearPreview();
+            }
         } else {
             clearPreview();
         }
+    }
+
+    function showArchivePreview(files) {
+        const archiveList = document.getElementById('archive-list') || createArchiveList();
+
+        // Actualizar contador en el header
+        const fileCount = files.filter(f => !f.isDirectory).length;
+        const dirCount = files.filter(f => f.isDirectory).length;
+
+        // Crear contenido HTML para el preview
+        let content = `<div class="archive-header">
+            <span>Contenido del archivo comprimido</span>
+            <span class="archive-count">${fileCount} archivos, ${dirCount} carpetas</span>
+        </div><div class="archive-files">`;
+
+        // Ordenar archivos: directorios primero, luego por nombre
+        files.sort((a, b) => {
+            if (a.isDirectory && !b.isDirectory) return -1;
+            if (!a.isDirectory && b.isDirectory) return 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        // Crear elementos para cada archivo
+        files.forEach(file => {
+            const icon = file.isDirectory ? 'fa-folder' : 'fa-file';
+            const sizeText = file.isDirectory ? '' : formatBytes(file.size);
+            const itemClass = file.isDirectory ? 'archive-directory' : 'archive-file-item';
+
+            content += `
+                <div class="archive-file ${itemClass}">
+                    <i class="fas ${icon}"></i>
+                    <span class="archive-file-name">${file.name}</span>
+                    <span class="archive-file-size">${sizeText}</span>
+                </div>`;
+        });
+
+        content += '</div>';
+
+        // Establecer contenido y mostrar
+        archiveList.innerHTML = content;
+        archiveList.classList.remove('hidden');
     }
 
     async function renderPdf(pdfData) {
@@ -759,56 +827,140 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.electronAPI.startSearch(searchPath, query, searchType);
     });
 
+    // --- Panel Width Persistence ---
+    function savePanelWidths() {
+        const leftPanel = document.getElementById('panel-left');
+        const rightPanel = document.getElementById('panel-right');
+        const previewPanel = document.getElementById('preview-panel');
+        const container = document.querySelector('.container');
+
+        const containerWidth = container.offsetWidth;
+        const leftWidth = (leftPanel.offsetWidth / containerWidth) * 100;
+        const rightWidth = (rightPanel.offsetWidth / containerWidth) * 100;
+        const previewWidth = (previewPanel.offsetWidth / containerWidth) * 100;
+
+        const widths = {
+            left: `${leftWidth.toFixed(1)}%`,
+            center: `${rightWidth.toFixed(1)}%`,
+            preview: `${previewWidth.toFixed(1)}%`
+        };
+
+        localStorage.setItem('panel-widths', JSON.stringify(widths));
+    }
+
+    function loadPanelWidths() {
+        const saved = localStorage.getItem('panel-widths');
+        if (!saved) return null;
+
+        try {
+            return JSON.parse(saved);
+        } catch (e) {
+            console.warn('Error loading panel widths:', e);
+            return null;
+        }
+    }
+
+    function applyPanelWidths(widths) {
+        const leftPanel = document.getElementById('panel-left');
+        const rightPanel = document.getElementById('panel-right');
+        const previewPanel = document.getElementById('preview-panel');
+
+        leftPanel.style.flex = `0 0 ${widths.left}`;
+        rightPanel.style.flex = `0 0 ${widths.center}`;
+        previewPanel.style.flex = `0 0 ${widths.preview}`;
+    }
+
     // --- Resizer Logic ---
-    const resizer = document.getElementById('resizer');
+    const leftResizer = document.getElementById('left-resizer');
+    const rightResizer = document.getElementById('resizer');
+    const leftPanel = document.getElementById('panel-left');
     const rightPanel = document.getElementById('panel-right');
+    const previewPanel = document.getElementById('preview-panel');
     const container = document.querySelector('.container');
 
     let isResizing = false;
+    let currentResizer = null;
 
-    resizer.addEventListener('mousedown', (e) => {
-        isResizing = true;
-        container.style.cursor = 'col-resize';
-        document.body.style.userSelect = 'none';
+    function initializeResizer(resizer, leftElement, rightElement, minLeftPercent = 15, minRightPercent = 25) {
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            currentResizer = resizer;
+            container.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
 
-        const mouseMoveHandler = (e) => {
-            if (!isResizing) return;
-            const containerRect = container.getBoundingClientRect();
-            const previewPanelMinWidth = 200; // Mínimo ancho para el panel de vista previa
-            const rightPanelMinWidth = 200; // Mínimo ancho para el panel derecho
+            const mouseMoveHandler = (e) => {
+                if (!isResizing || currentResizer !== resizer) return;
 
-            // Posición del ratón relativa al contenedor principal
-            const mouseX = e.clientX - containerRect.left;
+                const containerRect = container.getBoundingClientRect();
+                const containerWidth = containerRect.width;
 
-            // Ancho total disponible para los paneles flexibles
-            const totalFlexWidth = rightPanel.offsetWidth + previewPanel.offsetWidth;
+                // Posición del ratón relativa al contenedor
+                const mouseX = e.clientX - containerRect.left;
 
-            let newRightPanelWidth = mouseX - rightPanel.getBoundingClientRect().left;
-            let newPreviewPanelWidth = totalFlexWidth - newRightPanelWidth;
+                // Calcular anchos basados en posición del resizer
+                let newLeftWidth, newRightWidth;
 
-            if (newRightPanelWidth < rightPanelMinWidth || newPreviewPanelWidth < previewPanelMinWidth) {
-                return; // No permitir redimensionar por debajo del mínimo
-            }
+                if (resizer === leftResizer) {
+                    // Resizer izquierdo: afecta panel izquierdo vs (central + preview)
+                    newLeftWidth = mouseX - leftElement.getBoundingClientRect().left;
+                    const totalRightWidth = containerWidth - newLeftWidth;
+                    newRightWidth = rightElement.offsetWidth; // Mantener proporción central
+                } else {
+                    // Resizer derecho: afecta panel central vs preview
+                    const leftBoundary = leftElement.getBoundingClientRect().right;
+                    newLeftWidth = mouseX - leftBoundary;
+                    newRightWidth = containerWidth - mouseX;
+                }
 
-            // Usar flex para un comportamiento más predecible
-            rightPanel.style.flex = `0 0 ${newRightPanelWidth}px`;
-            previewPanel.style.flex = `1 1 ${newPreviewPanelWidth}px`;
-        };
+                // Aplicar límites mínimos
+                const minLeftPx = (minLeftPercent / 100) * containerWidth;
+                const minRightPx = (minRightPercent / 100) * containerWidth;
 
-        const mouseUpHandler = () => {
-            isResizing = false;
-            container.style.cursor = 'default';
-            document.body.style.userSelect = 'auto';
-            window.removeEventListener('mousemove', mouseMoveHandler);
-            window.removeEventListener('mouseup', mouseUpHandler);
-        };
+                if (resizer === leftResizer) {
+                    if (newLeftWidth < minLeftPx) newLeftWidth = minLeftPx;
+                } else {
+                    if (newLeftWidth < minLeftPx) newLeftWidth = minLeftPx;
+                    if (newRightWidth < minRightPx) newRightWidth = minRightPx;
+                }
 
-        window.addEventListener('mousemove', mouseMoveHandler);
-        window.addEventListener('mouseup', mouseUpHandler);
-    });
+                // Aplicar nuevos anchos
+                if (resizer === leftResizer) {
+                    leftElement.style.flex = `0 0 ${newLeftWidth}px`;
+                } else {
+                    rightElement.style.flex = `0 0 ${newLeftWidth}px`;
+                    previewPanel.style.flex = `0 0 ${newRightWidth}px`;
+                }
+            };
+
+            const mouseUpHandler = () => {
+                if (currentResizer === resizer) {
+                    isResizing = false;
+                    currentResizer = null;
+                    container.style.cursor = 'default';
+                    document.body.style.userSelect = 'auto';
+                    savePanelWidths(); // Guardar configuración
+                    window.removeEventListener('mousemove', mouseMoveHandler);
+                    window.removeEventListener('mouseup', mouseUpHandler);
+                }
+            };
+
+            window.addEventListener('mousemove', mouseMoveHandler);
+            window.addEventListener('mouseup', mouseUpHandler);
+        });
+    }
+
+    // Inicializar ambos resizers
+    initializeResizer(leftResizer, leftPanel, rightPanel, 0, 15); // Panel izquierdo sin mínimo estricto, central mínimo 15%
+    initializeResizer(rightResizer, rightPanel, previewPanel, 15, 25); // Central mínimo 15%, preview mínimo 25%
 
     // Initial Load
     try {
+        // Cargar configuración de anchos de panel guardada
+        const savedWidths = loadPanelWidths();
+        if (savedWidths) {
+            applyPanelWidths(savedWidths);
+        }
+
         // Obtener las rutas de Descargas y Escritorio del usuario
         const downloadsPath = await window.electronAPI.getDownloadsPath();
         const desktopPath = await window.electronAPI.getDesktopPath();

@@ -4,6 +4,7 @@ const fs = require('fs');
 const fsPromises = require('fs').promises;
 const fse = require('fs-extra');
 const { exec, execFile } = require('child_process');
+const yauzl = require('yauzl');
 
 // Registrar el protocolo personalizado
 // Temporarily commented out to fix startup error
@@ -293,6 +294,52 @@ ipcMain.handle('show-confirm-dialog', async (event, options) => {
         detail: options.detail || ''
     });
     return choice.response; // 0 for Cancelar, 1 for Aceptar
+});
+
+ipcMain.handle('read-zip-contents', async (event, filePath) => {
+    if (!isPathSafe(filePath)) {
+        return { success: false, error: 'Acceso denegado: Ruta no segura o inválida.' };
+    }
+
+    try {
+        const files = await new Promise((resolve, reject) => {
+            const fileList = [];
+
+            yauzl.open(filePath, { lazyEntries: true }, (err, zipfile) => {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+
+                zipfile.readEntry();
+                zipfile.on('entry', (entry) => {
+                    fileList.push({
+                        name: entry.fileName,
+                        size: entry.uncompressedSize,
+                        compressedSize: entry.compressedSize,
+                        isDirectory: entry.fileName.endsWith('/'),
+                        compressionMethod: entry.compressionMethod,
+                        lastModTime: entry.lastModFileTime || null
+                    });
+
+                    zipfile.readEntry(); // Continue reading
+                });
+
+                zipfile.on('end', () => {
+                    resolve(fileList);
+                });
+
+                zipfile.on('error', (error) => {
+                    reject(error);
+                });
+            });
+        });
+
+        return { success: true, files };
+    } catch (error) {
+        console.error('Error reading ZIP file:', error);
+        return { success: false, error: error.message };
+    }
 });
 // #endregion
 

@@ -40,4 +40,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onSearchFinished: (callback) => ipcRenderer.on('search-finished', (event, data) => callback(data)),
   onOperationProgress: (callback) => ipcRenderer.on('operation-progress', (event, data) => callback(data)),
   onOperationComplete: (callback) => ipcRenderer.on('operation-complete', (event, data) => callback(data)),
+
+  // Preview de archivos comprimidos
+  readZipContents: (filePath) => ipcRenderer.invoke('read-zip-contents', filePath),
 });
