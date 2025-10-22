@@ -16,37 +16,32 @@ const { exec } = require('child_process');
 // }
 
 // #region Security Validation
-let safeRoots = [];
 
 /**
- * Initializes the list of safe root directories for path validation.
- * On Windows, these are the logical drives (C:\, D:\, etc.).
- * On POSIX systems, it's the root directory (/).
+ * Validates a path to ensure it is canonical and does not contain malicious elements.
+ * The goal is not to restrict access, but to prevent Path Traversal attacks
+ * and path manipulation.
+ * @param {string} pathToValidate The path from the renderer process.
+ * @returns {boolean} `true` if the path is safe, `false` otherwise.
  */
-async function initializeSafeRoots() {
-  if (process.platform === 'win32') {
-    const command = 'powershell.exe -NoProfile -Command "Get-Volume | Select-Object -ExpandProperty DriveLetter | ForEach-Object { if ($_) { $_ + \':\\\' } }"';
-    return new Promise((resolve) => {
-      exec(command, (error, stdout) => {
-        if (error) {
-          console.error('Could not determine safe roots:', error);
-          safeRoots = []; // Fail securely
-        } else {
-          safeRoots = stdout.split('\n').map(d => d.trim()).filter(Boolean);
-        }
-        resolve();
-      });
-    });
-  } else {
-    safeRoots = ['/'];
-    return Promise.resolve();
-  }
-}
-
 function isPathSafe(pathToValidate) {
-  if (pathToValidate === 'computer:///') return true; // Special case for drive view
-  const resolvedPath = path.resolve(pathToValidate);
-  return safeRoots.some(root => resolvedPath.startsWith(root));
+  // 1. Reject invalid or empty paths
+  if (!pathToValidate || typeof pathToValidate !== 'string') {
+    return false;
+  }
+
+  // 2. Reject null characters
+  if (pathToValidate.includes('\0')) {
+    return false;
+  }
+
+  // 3. After normalization, the path must be absolute (unless it's a special path).
+  const normalizedPath = path.normalize(pathToValidate);
+  if (!path.isAbsolute(normalizedPath) && normalizedPath !== 'computer:///') {
+    return false;
+  }
+
+  return true;
 }
 // #endregion
 
@@ -614,12 +609,13 @@ if (!gotTheLock) {
           process.env.BACKUPS_PATH = path.join(userDataPath, 'backups');
           process.env.FILE_MANAGER_BASE_PATH = path.join(userDataPath, 'notesApp_Files');
       } else {
-        // Entorno de DESARROLLO
+        // Entorno de DESARROLLO - Usar userData también para consistencia
+        const userDataPath = app.getPath('userData');
         process.env.IS_PACKAGED = 'false';
-        // Definir rutas para datos de usuario en desarrollo (relativas al proyecto)
-        process.env.UPLOADS_PATH = path.join(__dirname, '..', 'src', 'public', 'uploads');
-        process.env.BACKUPS_PATH = path.join(__dirname, '..', 'backups');
-        process.env.FILE_MANAGER_BASE_PATH = path.join(__dirname, '..', 'notesApp_Files');
+        process.env.USER_DATA_PATH = userDataPath;
+        process.env.UPLOADS_PATH = path.join(userDataPath, 'dev_uploads');
+        process.env.BACKUPS_PATH = path.join(userDataPath, 'dev_backups');
+        process.env.FILE_MANAGER_BASE_PATH = path.join(userDataPath, 'dev_notesApp_Files');
       }
 
       // PASO 3: Creación Automática de Directorios
@@ -629,9 +625,6 @@ if (!gotTheLock) {
       fs.mkdirSync(path.join(process.env.UPLOADS_PATH, 'tmp'), { recursive: true });
       fs.mkdirSync(process.env.BACKUPS_PATH, { recursive: true });
       fs.mkdirSync(process.env.FILE_MANAGER_BASE_PATH, { recursive: true });
-
-      // Initialize security roots before creating the window
-      await initializeSafeRoots();
 
       // Iniciar directamente la ventana del gestor de archivos.
       createFileManagerWindow();
