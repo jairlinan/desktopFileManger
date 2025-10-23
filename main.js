@@ -61,7 +61,7 @@ function createFileManagerWindow() {
   fileManagerWindow.loadFile(path.join(__dirname, 'index.html'));
   fileManagerWindow.setMenu(null);
   // Abrir las Herramientas de Desarrollo para depuración.
-  // fileManagerWindow.webContents.openDevTools();
+  fileManagerWindow.webContents.openDevTools();
 }
 
 // #region File System Reading
@@ -285,7 +285,8 @@ ipcMain.handle('get-file-as-buffer', async (event, filePath) => {
 });
 
 ipcMain.handle('show-confirm-dialog', async (event, options) => {
-    const choice = await dialog.showMessageBox(win, {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const choice = await dialog.showMessageBox(window, {
         type: 'warning',
         buttons: ['Cancelar', 'Aceptar'],
         defaultId: 1,

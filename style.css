@@ -46,6 +46,21 @@ body {
       background-color: #5f6368;
     }
   }
+
+  #refresh-drives-button {
+    background-color: transparent;
+    color: #e8eaed;
+    border: 1px solid #5f6368;
+    border-radius: 5px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+
+    &:hover {
+      background-color: #5f6368;
+    }
+  }
 }
 
 /* Loading Indicator */
@@ -261,6 +276,10 @@ body {
 
       &.dragging {
         opacity: 0.5;
+      }
+
+      &.dragging:not(.drag-over) {
+        cursor: not-allowed;
       }
 
       &:hover {

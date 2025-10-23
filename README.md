@@ -48,7 +48,7 @@ Un panel dedicado a la derecha permite previsualizar archivos sin necesidad de a
 ### 6. Interacción y Usabilidad
 - **Menú Contextual**: Un menú contextual (clic derecho) proporciona acceso rápido a las operaciones más comunes (renombrar, eliminar, crear).
 - **Selección Múltiple**: Soporta la selección de múltiples elementos mediante `Ctrl+Click` y `Shift+Click`.
-- **Arrastrar y Soltar (Drag and Drop)**: Permite mover o copiar archivos arrastrándolos de un panel a otro.
+- **Arrastrar y Soltar (Drag and Drop)**: Permite mover o copiar archivos arrastrándolos de un panel a otro, mostrando un cuadro de dialogo para que el usuario escoja la acción a realizar.
 
 ---
 

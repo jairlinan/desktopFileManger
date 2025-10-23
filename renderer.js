@@ -238,6 +238,39 @@ document.addEventListener('DOMContentLoaded', async () => {
             updatePreviewForSelection(panelId, isSearchResult);
         });
     
+        // --- Drag and Drop Listeners for List Items ---
+        listItem.addEventListener('dragstart', (e) => {
+            console.log(`[Drag & Drop] Event: dragstart on "${file.name}"`);
+            const panel = panels[panelId];
+
+            // **CORRECCIÓN CLAVE**: Si el elemento arrastrado no está seleccionado,
+            // se limpia la selección anterior y se selecciona solo este elemento.
+            if (!listItem.classList.contains('selected')) {
+                panel.fileList.querySelectorAll('.selected').forEach(item => item.classList.remove('selected'));
+                listItem.classList.add('selected');
+            }
+            const selectedItems = panel.fileList.querySelectorAll('.selected');
+
+            dragSourceInfo = {
+                sourcePanelId: panelId,
+                fileNames: Array.from(selectedItems).map(item => item.dataset.fileName)
+            };
+            console.log('[Drag & Drop] Storing dragSourceInfo:', JSON.parse(JSON.stringify(dragSourceInfo))); // Log para depuración
+            selectedItems.forEach(item => item.classList.add('dragging'));
+            // Es crucial establecer datos para que el navegador considere la operación de arrastre como válida.
+            // Sin esto, el evento 'dragend' se dispara inmediatamente.
+            e.dataTransfer.setData('text/plain', dragSourceInfo.fileNames.join(','));
+            e.dataTransfer.effectAllowed = 'move';
+        });
+
+        // Limpieza global al finalizar el arrastre
+        listItem.addEventListener('dragend', () => {
+            document.querySelectorAll('.file-list li.dragging').forEach(item => item.classList.remove('dragging'));
+            console.log('[Drag & Drop] Event: dragend. Cleaning up dragSourceInfo.');
+            dragSourceInfo = null;
+        });
+
+
         return listItem;
     }
 
@@ -312,6 +345,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const errorReportList = document.getElementById('error-report-list');
     const errorReportOkBtn = document.getElementById('error-report-ok-btn');
     const errorReportCloseBtn = document.getElementById('error-report-close-btn');
+
+    // --- Drag and Drop Modal Elements ---
+    const dndModal = document.getElementById('dnd-choice-modal');
+    const dndMessage = document.getElementById('dnd-choice-message');
+    const dndCopyBtn = document.getElementById('dnd-copy-btn');
+    const dndMoveBtn = document.getElementById('dnd-move-btn');
+    const dndCancelBtn = document.getElementById('dnd-cancel-btn');
 
     const hideErrorModal = () => errorReportModal.classList.remove('active');
     errorReportOkBtn.addEventListener('click', hideErrorModal);
@@ -408,9 +448,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     sortBySelect.addEventListener('change', handleSortChange);
     sortOrderSelect.addEventListener('change', handleSortChange);
 
+    document.getElementById('refresh-drives-button').addEventListener('click', () => {
+        let refreshed = false;
+        ['left', 'right'].forEach(panelId => {
+            if (panels[panelId].currentPath === 'computer:///') {
+                loadDirectory(panelId, 'computer:///');
+                refreshed = true;
+            }
+        });
+        if (refreshed) {
+            showToast('Lista de unidades actualizada.', 'info');
+        }
+    });
+
     for (const panelId in panels) {
         const panel = panels[panelId];
-
         // Al hacer clic en cualquier parte del panel, se establece como activo
         panel.container.addEventListener('click', () => {
             if (activePanelId !== panelId) {
@@ -425,6 +477,58 @@ document.addEventListener('DOMContentLoaded', async () => {
         panel.container.addEventListener('contextmenu', e => {
             const listItem = e.target.closest('li');
             showContextMenu(e, panelId, listItem);
+        });
+
+        // --- Drag and Drop Listeners for Panels ---
+        panel.container.addEventListener('dragover', (e) => {
+            e.preventDefault(); // Allow drop
+            e.dataTransfer.dropEffect = 'move';
+        });
+
+        panel.container.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (!dragSourceInfo) return;
+
+            const sourcePanelId = dragSourceInfo.sourcePanelId;
+            const destPanelId = panelId;
+
+            // Don't allow dropping on the same panel
+            if (sourcePanelId === destPanelId) {
+                dragSourceInfo = null;
+                return;
+            }
+
+            const fileNames = dragSourceInfo.fileNames;
+            dragSourceInfo = null; // Clean up
+
+            // Show D&D modal
+            dndMessage.textContent = `¿Qué deseas hacer con ${fileNames.length === 1 ? `"${fileNames[0]}"` : `${fileNames.length} elementos`}?`;
+            dndModal.classList.add('active');
+
+            // Handle modal buttons
+            const handleCopy = () => {
+                dndModal.classList.remove('active');
+                handleFileOperation('copiar', sourcePanelId, destPanelId);
+            };
+
+            const handleMove = () => {
+                dndModal.classList.remove('active');
+                handleFileOperation('mover', sourcePanelId, destPanelId);
+            };
+
+            const handleCancel = () => {
+                dndModal.classList.remove('active');
+            };
+
+            // Remove previous listeners to avoid duplicates
+            dndCopyBtn.removeEventListener('click', handleCopy);
+            dndMoveBtn.removeEventListener('click', handleMove);
+            dndCancelBtn.removeEventListener('click', handleCancel);
+
+            // Add new listeners
+            dndCopyBtn.addEventListener('click', handleCopy);
+            dndMoveBtn.addEventListener('click', handleMove);
+            dndCancelBtn.addEventListener('click', handleCancel);
         });
 
         panel.upButton.addEventListener('click', async () => {
